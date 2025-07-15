@@ -110,17 +110,17 @@ namespace Console_based
 
     public class LightManager
     {
-        Vector3 _ambientColor;
-        DirectLight _DirectLigth;
-        SphereLight[] _sphereLights;
-        int _totalLights;
+        public Vector3 ambientColor { get; private set; }
+        public DirectLight DirectLigth { get; private set; }
+        public SphereLight[] sphereLights { get; private set; }
+        public int totalLights { get; private set; }
 
         public LightManager(Vector3 ambientColor,DirectLight directLight, SphereLight[] sphereLights, int totalLights)
         {
-            _ambientColor = ambientColor;
-            _DirectLigth = directLight;
-            _sphereLights = sphereLights;
-            _totalLights = totalLights;
+            this.ambientColor = ambientColor;
+            DirectLigth = directLight;
+            this.sphereLights = sphereLights;
+            this.totalLights = totalLights;
         }
 
         public void ClampColor(ref Vector3 targetColor)
@@ -132,35 +132,35 @@ namespace Console_based
 
         public void setDirectLight(DirectLight light)
         {
-            _DirectLigth = light;
+            DirectLigth = light;
         }
 
         public void setLights(DirectLight light, SphereLight[] sphereLights,int totalLights)
         {
-            _sphereLights = sphereLights;
-            _totalLights = totalLights;
-            _DirectLigth = light;
+            this.sphereLights = sphereLights;
+            this.totalLights = totalLights;
+            DirectLigth = light;
         }
 
         public void addSphereLight(SphereLight light)
         {
-            _sphereLights[_totalLights] = light;
-            _totalLights++;
+            sphereLights[totalLights] = light;
+            totalLights++;
         }
         public void SetSphereLights(SphereLight[] lights, int totalLights)
         {
-            _sphereLights = lights;
-            _totalLights = totalLights;
+            sphereLights = lights;
+            this.totalLights = totalLights;
         }
 
         public Color GetColorWithLighting(Vertex v)
         {
-            Vector3 lightingIntensity = _ambientColor;
+            Vector3 lightingIntensity = ambientColor;
             //_sun.addDirectLight(v._normal, ref lightingIntensity);
 
-            for (int i = 0; i < _sphereLights.Length; i++)
+            for (int i = 0; i < sphereLights.Length; i++)
             {
-                _sphereLights[i].addSphereLight(v._normal, v._worldPoint, ref lightingIntensity);
+                sphereLights[i].addSphereLight(v._normal, v._worldPoint, ref lightingIntensity);
             }
             ClampColor(ref lightingIntensity);
             Color result = Color.FromArgb((int)(lightingIntensity.x * v._color.R), (int)(lightingIntensity.y * v._color.G), (int)(lightingIntensity.z * v._color.B));

@@ -80,12 +80,7 @@ namespace Console_based
         static List<Mesh> _meshes;
         static List<FlatMesh> _flatMeshes;
         static Camera _camera;
-        static DirectLight _DirectLigth;
-        static Vector3 _ambientColor = new Vector3(0.2f,0.2f,0.2f);
-
-        static SphereLight[] _sphereLights = new SphereLight[2000];
-        static int totalLights = 0;
-
+        static LightManager _lightManager;
 
         static Vertex[] cachedVertexBuffer = new Vertex[2000];
         static int[] cachedIndexBuffer = new int[2000];
@@ -110,26 +105,10 @@ namespace Console_based
         {
             _camera = camera;
         }
-        static public void setDirectLight(DirectLight light)
-        {
-            _DirectLigth = light;
-        }
-        static public void setLights(DirectLight light, SphereLight[] sphereLights)
-        {
-            _sphereLights = sphereLights;
-            totalLights = sphereLights.Length;
-            _DirectLigth = light;
-        }
 
-        static public void addSphereLight(SphereLight light)
+        static public void setLightManager(LightManager lightManager)
         {
-            _sphereLights[totalLights] = light;
-            totalLights++;
-        }
-        static public void SetSphereLights(SphereLight[] lights)
-        {
-            _sphereLights = lights;
-            totalLights = lights.Length;
+            _lightManager = lightManager;
         }
 
         static public void AddMesh(Mesh mesh)
@@ -214,20 +193,6 @@ namespace Console_based
             targetColor.z = Math.Clamp(targetColor.z, 0, 1);
         }
 
-        static Color FragmentLoop(Vertex v)
-        {
-            Vector3 lightingIntensity = _ambientColor;
-            //_sun.addDirectLight(v._normal, ref lightingIntensity);
-
-            for(int i =0; i < totalLights; i++)
-            {
-                _sphereLights[i].addSphereLight(v._normal, v._worldPoint, ref lightingIntensity);
-            }
-            ClampColor(ref lightingIntensity);
-            Color result = Color.FromArgb((int)(lightingIntensity.x * v._color.R), (int)(lightingIntensity.y * v._color.G), (int)(lightingIntensity.z * v._color.B));
-            return result;
-        }
-
         static public unsafe void FillTriangle2(byte* buffer, int stride, Vertex v1, Vertex v2, Vertex v3)
         {
             Vector3 p1 = v1._screenSpacePoint;
@@ -264,7 +229,8 @@ namespace Console_based
                     {
                         Vertex temp = Vertex.BaryCentrePoint(v1, v2, v3, (float)w1, (float)w2, (float)w3);
                         //Color colorDebug = Color.FromArgb((int)((temp._normal.x+1f) * 127), (int)((temp._normal.y + 1f) * 127), (int)((temp._normal.z + 1f) * 127));
-                        Color color = FragmentLoop(temp);
+                        Color color = _lightManager.GetColorWithLighting(temp);
+                        //Color color = FragmentLoop(temp);
                         if (pixelInfront(x,y,temp._screenSpacePoint.z))
                         {
                             SetPixel(buffer, stride, x, y, color);

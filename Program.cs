@@ -30,6 +30,7 @@ namespace Console_based
         static public DirectLight noLight = new DirectLight(new Vector3(0, 0,0), new Vector3(0, 0, 0));
         static SphereLight[] _lights = [new SphereLight(0.1f, 0.1f, 0.001f, 200f, new Vector3(5f, -5f, 20), new Vector3(1f, 1f, 0.8f))];
         static SphereLight _currentLight;
+        static LightManager _lightManager = new(new(0.2f, 0.2f, 0.2f), sun, _lights, 3);
 
         static GameWindow window = new GameWindow(width, height);
 
@@ -95,7 +96,7 @@ namespace Console_based
             myMesh2.LoadMeshFromFile("model.obj");
 
             Renderer.AddFlatMesh(myMesh2);
-            Renderer.SetSphereLights(_lights);
+            Renderer.setLightManager(_lightManager);
 
             window.startGameLoop();
             window.OnKeyDown += OnKeyPress;
