@@ -8,29 +8,29 @@ namespace Console_based
 {
     public class DirectLight
     {
-        Vector3 _LightColor;
-        Vector3 _LightDirection;
+        Vector3 _lightColor;
+        Vector3 _lightDirection;
         public DirectLight(Vector3 lightColor, Vector3 lightDirection)
         {
-            _LightColor = lightColor;
-            _LightDirection = lightDirection;
+            _lightColor = lightColor;
+            _lightDirection = lightDirection;
         }
         public void MoveBy(float x, float y, float z)
         {
-            _LightDirection.x += x;
-            _LightDirection.y += y;
-            _LightDirection.z += z;
+            _lightDirection.x += x;
+            _lightDirection.y += y;
+            _lightDirection.z += z;
         }
         public void addDirectLight(Vector3 normal, ref Vector3 target)
         {
-            float intensity = Math.Max(0, Vector3.GetDotProduct(normal, _LightDirection));
+            float intensity = Math.Max(0, Vector3.GetDotProduct(normal, _lightDirection));
             if (intensity == 0)
             {
                 return;
             }
-            target.x += _LightColor.x * intensity;
-            target.y += _LightColor.y * intensity;
-            target.z += _LightColor.z * intensity;
+            target.x += _lightColor.x * intensity;
+            target.y += _lightColor.y * intensity;
+            target.z += _lightColor.z * intensity;
         }
     }
 
@@ -60,7 +60,6 @@ namespace Console_based
         {
             Vector3 result = new Vector3(_lightPos.x - point.x, _lightPos.y - point.y, _lightPos.z - point.z);
             return result;
-            //return new Vector3(_lightPos.x - point.x,_lightPos.y - point.y, _lightPos.z - point.z);
         }
         public float getMaxDistance()
         {
@@ -111,14 +110,14 @@ namespace Console_based
     public class LightManager
     {
         public Vector3 ambientColor { get; private set; }
-        public DirectLight DirectLigth { get; private set; }
+        public DirectLight DirectLight { get; private set; }
         public SphereLight[] sphereLights { get; private set; }
         public int totalLights { get; private set; }
 
         public LightManager(Vector3 ambientColor,DirectLight directLight, SphereLight[] sphereLights, int totalLights)
         {
             this.ambientColor = ambientColor;
-            DirectLigth = directLight;
+            DirectLight = directLight;
             this.sphereLights = sphereLights;
             this.totalLights = totalLights;
         }
@@ -132,14 +131,14 @@ namespace Console_based
 
         public void setDirectLight(DirectLight light)
         {
-            DirectLigth = light;
+            DirectLight = light;
         }
 
         public void setLights(DirectLight light, SphereLight[] sphereLights,int totalLights)
         {
             this.sphereLights = sphereLights;
             this.totalLights = totalLights;
-            DirectLigth = light;
+            DirectLight = light;
         }
 
         public void addSphereLight(SphereLight light)
@@ -156,14 +155,14 @@ namespace Console_based
         public Color GetColorWithLighting(Vertex v)
         {
             Vector3 lightingIntensity = ambientColor;
-            //_sun.addDirectLight(v._normal, ref lightingIntensity);
+            DirectLight.addDirectLight(v.Normal, ref lightingIntensity);
 
             for (int i = 0; i < sphereLights.Length; i++)
             {
-                sphereLights[i].addSphereLight(v._normal, v._worldPoint, ref lightingIntensity);
+                sphereLights[i].addSphereLight(v.Normal, v.WorldPoint, ref lightingIntensity);
             }
             ClampColor(ref lightingIntensity);
-            Color result = Color.FromArgb((int)(lightingIntensity.x * v._color.R), (int)(lightingIntensity.y * v._color.G), (int)(lightingIntensity.z * v._color.B));
+            Color result = Color.FromArgb((int)(lightingIntensity.x * v.Color.R), (int)(lightingIntensity.y * v.Color.G), (int)(lightingIntensity.z * v.Color.B));
             return result;
         }
     }

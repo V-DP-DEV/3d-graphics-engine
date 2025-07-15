@@ -82,11 +82,11 @@ namespace Console_based
         static Camera _camera;
         static LightManager _lightManager;
 
-        static Vertex[] cachedVertexBuffer = new Vertex[2000];
-        static int[] cachedIndexBuffer = new int[2000];
-        static int cachedTotalIndices = 0;
-        static bool[] cacheBoolsInBox = new bool[2000];
-        static int cacheTotalPoints = 0;
+        static Vertex[] _cachedVertexBuffer = new Vertex[2000];
+        static int[] _cachedIndexBuffer = new int[2000];
+        static int _cachedTotalIndices = 0;
+        static bool[] _cacheBoolsInBox = new bool[2000];
+        static int _cacheTotalPoints = 0;
 
         static public void setDrawRules(int width,int height)
         {
@@ -125,14 +125,17 @@ namespace Console_based
         {
             for (int i = 0; i < count; i++)
             {
-                Vector3 point = projectedPs[i]._worldPoint;
-                float x = _projMatrix.elements[0, 0] * (point.x + _camera._cameraX);
-                float y = _projMatrix.elements[1, 1] * (point.y + _camera._cameraY);
-                float z = _projMatrix.elements[2, 2] * (point.z + _projMatrix.elements[3, 2] + _camera._cameraZ);
-                float w = _projMatrix.elements[2, 3] * (point.z + _camera._cameraZ);
+                Vector3 point = projectedPs[i].WorldPoint;
+                float x = _projMatrix.elements[0, 0] * (point.x - _camera.CameraX);
+                float y = _projMatrix.elements[1, 1] * (point.y - _camera.CameraY);
+                
+                float z = _projMatrix.elements[2, 2] * (point.z - _camera.CameraZ) + _projMatrix.elements[3, 2];
+                float w = _projMatrix.elements[2, 3] * (point.z - _camera.CameraZ);
+                //float w = _projMatrix.elements[2, 3] * (point.z + _camera.CameraZ);
+                //float z = _projMatrix.elements[2, 2] * (point.z + _projMatrix.elements[3, 2] + _camera.CameraZ);
                 projectedPs[i].SetHomougnesPoint(x, y, z, w);
             };
-            cacheTotalPoints = count;
+            _cacheTotalPoints = count;
         }
 
         static public void SetProjectionMatrix(float far, float near, float fov)
@@ -141,6 +144,7 @@ namespace Console_based
             //[0,S,0,0]
             //[0,0,-f/(f-n),-1]
             //[0,0,-f*n/(f-n),0]
+
             //[1,0,0,0]
             //[0,1,0,0]
             //[0,0,1,0]
@@ -153,14 +157,6 @@ namespace Console_based
             _projMatrix.elements[2, 2] = -far / (far - near);
             _projMatrix.elements[2, 3] = -1;
             _projMatrix.elements[3, 2] = (-far * near) / (far - near);
-        }
-        static private unsafe void SetPixel(byte* buffer, int stride, int x, int y, Color color, Vector3 lighting)
-        {
-            byte* pixel = buffer + (stride * y) + (x * 4);
-            pixel[0] = (byte)(color.B * lighting.z);
-            pixel[1] = (byte)(color.G * lighting.y);
-            pixel[2] = (byte)(color.R * lighting.x);
-            pixel[3] = color.A;
         }
 
         static private unsafe void SetPixel(byte* buffer, int stride, int x, int y, Color color)
@@ -186,18 +182,11 @@ namespace Console_based
             _zBuffer[y * _width + x] = z;
         }
 
-        static private void ClampColor(ref Vector3 targetColor)
-        {
-            targetColor.x = Math.Clamp(targetColor.x, 0, 1);
-            targetColor.y = Math.Clamp(targetColor.y, 0, 1);
-            targetColor.z = Math.Clamp(targetColor.z, 0, 1);
-        }
-
         static public unsafe void FillTriangle2(byte* buffer, int stride, Vertex v1, Vertex v2, Vertex v3)
         {
-            Vector3 p1 = v1._screenSpacePoint;
-            Vector3 p2 = v2._screenSpacePoint;
-            Vector3 p3 = v3._screenSpacePoint;
+            Vector3 p1 = v1.ScreenSpacePoint;
+            Vector3 p2 = v2.ScreenSpacePoint;
+            Vector3 p3 = v3.ScreenSpacePoint;
 
             float area = EdgeFunction(p1,p2,p3);
             if (area <= 0)
@@ -228,13 +217,11 @@ namespace Console_based
                     if (w1 >= 0 && w2 >= 0 && w3 >= 0)
                     {
                         Vertex temp = Vertex.BaryCentrePoint(v1, v2, v3, (float)w1, (float)w2, (float)w3);
-                        //Color colorDebug = Color.FromArgb((int)((temp._normal.x+1f) * 127), (int)((temp._normal.y + 1f) * 127), (int)((temp._normal.z + 1f) * 127));
-                        Color color = _lightManager.GetColorWithLighting(temp);
-                        //Color color = FragmentLoop(temp);
-                        if (pixelInfront(x,y,temp._screenSpacePoint.z))
+                        if (pixelInfront(x,y,temp.ScreenSpacePoint.z))
                         {
+                            Color color = _lightManager.GetColorWithLighting(temp);
                             SetPixel(buffer, stride, x, y, color);
-                            setZValue(x, y, temp._screenSpacePoint.z);
+                            setZValue(x, y, temp.ScreenSpacePoint.z);
                         }
                     }
                 }
@@ -258,16 +245,17 @@ namespace Console_based
             count = 0;
             for (int i = 0; i < len; i += 3)
             {
-                //if (cacheBoolsInBox[indexBuffer[i]] && cacheBoolsInBox[indexBuffer[i + 1]] && cacheBoolsInBox[indexBuffer[i + 2]])
-                //{
+                if (vertexBuffer[i].InFrustrum() && vertexBuffer[i+1].InFrustrum() && vertexBuffer[i+2].InFrustrum())
+                {
                     vertexBuffer[count] = vertexBuffer[i];
-                    vertexBuffer[count+1] = vertexBuffer[i+1];
-                    vertexBuffer[count+2] = vertexBuffer[i+2];
+                    vertexBuffer[count + 1] = vertexBuffer[i + 1];
+                    vertexBuffer[count + 2] = vertexBuffer[i + 2];
 
                     vertexBuffer[count].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
                     vertexBuffer[count + 1].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
                     vertexBuffer[count + 2].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
                     count += 3;
+                }
             }
         }
 
@@ -291,18 +279,14 @@ namespace Console_based
                 foreach (FlatMesh mesh in _flatMeshes)
                 {
                     long memoryBfore = GC.GetTotalMemory(false);
-                    cacheTotalPoints = 0;
-                    mesh.CopyDataToVertexBuffer(ref cachedVertexBuffer,ref cacheTotalPoints);
-                    ProjectPoints2(ref cachedVertexBuffer, cacheTotalPoints);
-                    getScreenSpaceFlatMesh(ref cachedVertexBuffer, ref cacheTotalPoints);
-
-                    //getScreenSpaceMesh2(cachedVertexBuffer, mesh.getIndexBuffer(), mesh._indexCount, ref cachedIndexBuffer, out cachedTotalIndices);
-                    for (int i = 0; i < cacheTotalPoints; i += 3)
+                    _cacheTotalPoints = 0;
+                    mesh.CopyDataToVertexBuffer(ref _cachedVertexBuffer,ref _cacheTotalPoints);
+                    ProjectPoints2(ref _cachedVertexBuffer, _cacheTotalPoints);
+                    getScreenSpaceFlatMesh(ref _cachedVertexBuffer, ref _cacheTotalPoints);
+                    for (int i = 0; i < _cacheTotalPoints; i += 3)
                     {
-                        FillTriangle2(pixelBuffer, stride, cachedVertexBuffer[i], cachedVertexBuffer[i+1], cachedVertexBuffer[i+2]);
+                        FillTriangle2(pixelBuffer, stride, _cachedVertexBuffer[i], _cachedVertexBuffer[i+1], _cachedVertexBuffer[i+2]);
                     }
-                    //long memoryAfter = GC.GetTotalMemory(false);
-                    //Console.WriteLine("Frames allocated: " + (memoryAfter - memoryBfore));
                 }
             }
             _bmp.UnlockBits(bmpData);

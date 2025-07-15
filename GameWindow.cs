@@ -11,12 +11,12 @@ namespace Console_based
 {
     class GameWindow : Form
     {
-        private readonly HashSet<Keys> keyPressed = new HashSet<Keys>();
-        private Bitmap bmpDisplay;
-        private Bitmap bmpTarget;
-        private int framesCompleted = 0;
-        private int totalTime = 0;
-        readonly object swapLock = new object();
+        private readonly HashSet<Keys> _keyPressed = new HashSet<Keys>();
+        private Bitmap _bmpDisplay;
+        private Bitmap _bmpTarget;
+        private int _framesCompleted = 0;
+        private int _totalTime = 0;
+        readonly object _swapLock = new object();
         public event Action<HashSet<Keys>> OnKeyDown;
 
         public GameWindow(int width, int height)
@@ -40,15 +40,15 @@ namespace Console_based
             //this.TopMost = true;
             this.Text = "Game Window";
             this.Paint += OnPaint;
-            bmpDisplay = new Bitmap(width, height);
-            bmpTarget = new Bitmap(width, height);
-            this.KeyDown += (s, e) => keyPressed.Add(e.KeyCode);
-            this.KeyUp += (s, e) => keyPressed.Remove(e.KeyCode);
+            _bmpDisplay = new Bitmap(width, height);
+            _bmpTarget = new Bitmap(width, height);
+            this.KeyDown += (s, e) => _keyPressed.Add(e.KeyCode);
+            this.KeyUp += (s, e) => _keyPressed.Remove(e.KeyCode);
         }
         public void OnPaint(object sender, PaintEventArgs e)
         {
-            lock (swapLock) {
-                e.Graphics.DrawImageUnscaled(bmpDisplay, 0, 0);
+            lock (_swapLock) {
+                e.Graphics.DrawImageUnscaled(_bmpDisplay, 0, 0);
             }
         }
         public void startGameLoop()
@@ -60,9 +60,9 @@ namespace Console_based
         private void UpdateFrameRateInfo(int deltaTime)
         {
             Console.WriteLine("FPS: " + deltaTime);
-            totalTime += deltaTime;
-            framesCompleted++;
-            Console.WriteLine("Fps:average " + totalTime / framesCompleted);
+            _totalTime += deltaTime;
+            _framesCompleted++;
+            Console.WriteLine("Fps:average " + _totalTime / _framesCompleted);
         }
 
         private void gameLoop()
@@ -72,20 +72,17 @@ namespace Console_based
             while (true)
             {
                 long currentTime = watch.ElapsedMilliseconds;
-                OnKeyDown?.Invoke(keyPressed);
+                OnKeyDown?.Invoke(_keyPressed);
                 
-                Renderer.DrawToScreenSpace(bmpTarget);
-                lock (swapLock)
+                Renderer.DrawToScreenSpace(_bmpTarget);
+                lock (_swapLock)
                 {
-                    Bitmap temp = bmpDisplay;
-                    bmpDisplay = bmpTarget;
-                    bmpTarget = temp;
+                    Bitmap temp = _bmpDisplay;
+                    _bmpDisplay = _bmpTarget;
+                    _bmpTarget = temp;
                 }
-                //Console.WriteLine("Render " + (watch.ElapsedMilliseconds - currentTime));
-                //currentTime = watch.ElapsedMilliseconds;
 
                 this.Invalidate();
-                //Console.WriteLine("Refresh "+(watch.ElapsedMilliseconds - currentTime));
 
                 int deltaT = (int)(watch.ElapsedMilliseconds - currentTime);
                 UpdateFrameRateInfo(deltaT);

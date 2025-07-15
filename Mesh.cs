@@ -12,14 +12,14 @@ namespace Console_based
         public int _vectorCount = 0;
         int[] _indexBuffer;
         public int _indexCount = 0;
-        Color[] _ColorBuffer;
+        Color[] _colorBuffer;
         public int _faceCount = 0;
         Vector3[] _normalVector;
         public Mesh(Vector3[] vectorBuffer, int[] indexBuffer, Color[] colorBuffer)
         {
             _vectorBuffer = vectorBuffer;
             _indexBuffer = indexBuffer;
-            _ColorBuffer = colorBuffer;
+            _colorBuffer = colorBuffer;
             _vectorCount = vectorBuffer.Length;
             _indexCount = indexBuffer.Length;
             _faceCount = colorBuffer.Length;
@@ -29,7 +29,7 @@ namespace Console_based
         {
             _vectorBuffer = new Vector3[2000];
             _indexBuffer = new int[2000];
-            _ColorBuffer = new Color[2000];
+            _colorBuffer = new Color[2000];
         }
         public void Clear()
         {
@@ -52,7 +52,7 @@ namespace Console_based
         }
         public Color[] getColorBuffer()
         {
-            return _ColorBuffer;
+            return _colorBuffer;
         }
         public Vector3[] getNormalBuffer()
         {
@@ -78,7 +78,7 @@ namespace Console_based
         {
             for(int i = 0; i < _vectorCount; i++)
             {
-                targetBuffer[i]._worldPoint = _vectorBuffer[i];
+                targetBuffer[i].WorldPoint = _vectorBuffer[i];
             }
         }
     }
@@ -167,10 +167,6 @@ namespace Console_based
             _points[_totalPoints+2] = p2;
             _colors[_faceCount] = color;
 
-            //_normals[_faceCount].x = (p2.y - p0.y) * (p1.z - p0.z) - (p2.z - p0.z) * (p1.y - p0.y);
-            //_normals[_faceCount].y = (p2.x - p0.x) * (p1.z - p0.z) - (p2.z - p0.z) * (p1.x - p0.x);
-            //_normals[_faceCount].z = ((p2.x - p0.x) * (p1.y - p0.y) - (p2.y - p0.y) * (p1.x - p0.x))*-1;
-
             _normals[_faceCount].x = (p0.y - p1.y) * (p0.z - p2.z) - (p0.z - p1.z) * (p0.y - p2.y);
             _normals[_faceCount].y = ((p0.x - p1.x) * (p0.z - p2.z) - (p0.z - p1.z) * (p0.x - p2.x)) * -1;
             _normals[_faceCount].z = (p0.x - p1.x) * (p0.y - p2.y) - (p0.y - p1.y) * (p0.x - p2.x);
@@ -209,39 +205,40 @@ namespace Console_based
 
     public struct Vertex
     {
-        public Vector3 _worldPoint;
-        public Vector4 _homogounesPoint;
-        public float _u;
-        public float _v;
-        public Vector3 _screenSpacePoint; 
-        public Vector3 _normal;
-        public Color _color;
+        public Vector3 WorldPoint;
+        public Vector4 HomogounesPoint;
+        public float U;
+        public float V;
+        public Vector3 ScreenSpacePoint; 
+        public Vector3 Normal;
+        public Color Color;
 
         public Vertex(Vector3 worldPoint,float u, float v, Vector3 normal, Color color)
         {
-            _worldPoint = worldPoint;
-            _u = u;
-            _v = v;
-            _normal = normal;
-            _color = color;
+            WorldPoint = worldPoint;
+            U = u;
+            V = v;
+            Normal = normal;
+            Color = color;
         }
 
         public void SetHomougnesPoint(float x, float y, float z, float w)
         {
-            _homogounesPoint = new Vector4(x,y,z,w);
+            HomogounesPoint = new Vector4(x,y,z,w);
         }
 
         public bool InFrustrum()
         {
-            if ( -_homogounesPoint.w > _homogounesPoint.x || _homogounesPoint.w < _homogounesPoint.x)
+            float w = (HomogounesPoint.w);
+            if ( -w > HomogounesPoint.x || w < HomogounesPoint.x)
             {
                 return false;
             }
-            if (-_homogounesPoint.w > _homogounesPoint.y || _homogounesPoint.w < _homogounesPoint.y)
+            if (-w > HomogounesPoint.y || w < HomogounesPoint.y)
             {
                 return false;
             }
-            if (0 > _homogounesPoint.z || _homogounesPoint.w < _homogounesPoint.z)
+            if (0 > HomogounesPoint.z || w < HomogounesPoint.z)
             {
                 return false;
             }
@@ -251,24 +248,25 @@ namespace Console_based
         static public Vertex BaryCentrePoint(Vertex v1, Vertex v2, Vertex v3, float w1, float w2, float w3)
         {
             Vertex result = new Vertex();
-            Vector3 p1 = v1._screenSpacePoint;
-            Vector3 p2 = v2._screenSpacePoint;
-            Vector3 p3 = v3._screenSpacePoint;
-            result._screenSpacePoint = new Vector3(p1.x * w1 + p2.x * w2 + p3.x * w3, p1.y * w1 + p2.y * w2 + p3.y * w3, p1.z * w1 + p2.z * w2 + p3.z * w3);
-            p1 = v1._worldPoint;
-            p2 = v2._worldPoint;
-            p3 = v3._worldPoint;
+            Vector3 p1 = v1.ScreenSpacePoint;
+            Vector3 p2 = v2.ScreenSpacePoint;
+            Vector3 p3 = v3.ScreenSpacePoint;
+            result.ScreenSpacePoint = new Vector3(p1.x * w1 + p2.x * w2 + p3.x * w3, p1.y * w1 + p2.y * w2 + p3.y * w3, p1.z * w1 + p2.z * w2 + p3.z * w3);
+            p1 = v1.WorldPoint;
+            p2 = v2.WorldPoint;
+            p3 = v3.WorldPoint;
 
-            result._worldPoint = new Vector3(p1.x * w1 + p2.x * w2 + p3.x * w3, p1.y * w1 + p2.y * w2 + p3.y * w3, p1.z * w1 + p2.z * w2 + p3.z * w3);
+            result.WorldPoint = new Vector3(p1.x * w1 + p2.x * w2 + p3.x * w3, p1.y * w1 + p2.y * w2 + p3.y * w3, p1.z * w1 + p2.z * w2 + p3.z * w3);
 
-            result._normal = v1._normal;
-            result._color = v1._color;
+            result.Normal = v1.Normal;
+            result.Color = v1.Color;
             return result;
         }
 
         public void SetToScreenSpace(float width, float height)
         {
-            _screenSpacePoint = new Vector3((int)((_homogounesPoint.x / _homogounesPoint.w + 1) * width), (int)((_homogounesPoint.y / _homogounesPoint.w + 1) * height), _homogounesPoint.z / _homogounesPoint.w);
+            //ScreenSpacePoint = new Vector3((int)((HomogounesPoint.x / HomogounesPoint.w + 1) * width), (int)((HomogounesPoint.y / HomogounesPoint.w + 1) * height), HomogounesPoint.z / HomogounesPoint.w);
+            ScreenSpacePoint = new Vector3((int)((HomogounesPoint.x / HomogounesPoint.w + 1) * width), (int)((-HomogounesPoint.y / HomogounesPoint.w + 1) * height), HomogounesPoint.z / HomogounesPoint.w);
             //do additional divisions by w like for u v and color
         }
     }
