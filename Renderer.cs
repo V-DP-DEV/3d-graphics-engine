@@ -1,8 +1,4 @@
-﻿using System.Drawing;
-using System;
-using System.Drawing.Imaging;
-using static System.Windows.Forms.DataFormats;
-using System.Diagnostics;
+﻿using System.Drawing.Imaging;
 
 namespace Console_based
 {
@@ -64,7 +60,9 @@ namespace Console_based
             elements = new float[4, 4];
         }
     };
-    
+
+    //TO:DO
+    //update when doing camera rotation, adding viewspace and fixing winding check
     static class Renderer
     {
         static Matrix44 _projMatrix;
@@ -121,7 +119,7 @@ namespace Console_based
             _flatMeshes.Add(mesh);
         }
 
-        static private void ProjectPoints2(ref Vertex[] projectedPs, int count)
+        static private void ProjectPoints(ref Vertex[] projectedPs, int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -131,8 +129,6 @@ namespace Console_based
                 
                 float z = _projMatrix.elements[2, 2] * (point.z - _camera.CameraZ) + _projMatrix.elements[3, 2];
                 float w = _projMatrix.elements[2, 3] * (point.z - _camera.CameraZ);
-                //float w = _projMatrix.elements[2, 3] * (point.z + _camera.CameraZ);
-                //float z = _projMatrix.elements[2, 2] * (point.z + _projMatrix.elements[3, 2] + _camera.CameraZ);
                 projectedPs[i].SetHomougnesPoint(x, y, z, w);
             };
             _cacheTotalPoints = count;
@@ -159,40 +155,23 @@ namespace Console_based
             _projMatrix.elements[3, 2] = (-far * near) / (far - near);
         }
 
-        static private unsafe void SetPixel(byte* buffer, int stride, int x, int y, Color color)
+        static private unsafe void SetPixel(byte* buffer, int stride, int x, int y, Vector3 color)
         {
             byte* pixel = buffer + (stride * y) + (x * 4);
-            pixel[0] = (byte)(color.B);
-            pixel[1] = (byte)(color.G);
-            pixel[2] = (byte)(color.R);
-            pixel[3] = color.A;
+            pixel[0] = (byte)(color.z);
+            pixel[1] = (byte)(color.y);
+            pixel[2] = (byte)(color.x);
+            pixel[3] = 255;
         }
 
-        static private bool pixelInfront(int x, int y, float z)
-        {
-            if (_zBuffer[y * _width + x] > z)
-            {
-                return true;
-            }
-            ;
-            return false;
-        }
-        static private void setZValue(int x, int y, float z)
-        {
-            _zBuffer[y * _width + x] = z;
-        }
-
-        static public unsafe void FillTriangle2(byte* buffer, int stride, Vertex v1, Vertex v2, Vertex v3)
+        //to:do map appropriately to ensure weights dont exceed 1.
+        static public unsafe void FillTriangle(byte* buffer, int stride, Vertex v1, Vertex v2, Vertex v3)
         {
             Vector3 p1 = v1.ScreenSpacePoint;
             Vector3 p2 = v2.ScreenSpacePoint;
             Vector3 p3 = v3.ScreenSpacePoint;
 
-            float area = EdgeFunction(p1,p2,p3);
-            if (area <= 0)
-            {
-                return;
-            }
+            float area = EdgeFunction(p1, p2, p3);
 
             int x0 = (int)Math.Min(p1.x, p2.x);
             x0 = (int)Math.Min(x0, p3.x);
@@ -206,27 +185,88 @@ namespace Console_based
             int y1 = (int)Math.Max(p1.y, p2.y);
             y1 = (int)Math.Max(y1, p3.y);
 
-            for(int y = y0; y <= y1; y++)
+            float dW1 = (p3.y - p2.y) / area;
+            float dW2 = (p1.y - p3.y) / area;
+            float dW3 = (p2.y - p1.y) / area;
+
+            Vertex temp = new Vertex();
+            Vector3 color = new Vector3(255,255,255);
+
+            for (int y = y0; y <= y1; y++)
             {
+                float w1 = EdgeFunction(p2, p3, x0, y) / area;
+                float w2 = EdgeFunction(p3, p1, x0, y) / area;
+                float w3 = EdgeFunction(p1, p2, x0, y) / area;
                 for (int x = x0; x <= x1; x++)
                 {
-                    double w1 = EdgeFunction(p2, p3, x, y) / area;
-                    double w2 = EdgeFunction(p3, p1, x, y) /area;
-                    double w3 = EdgeFunction(p1, p2, x, y) / area;
-
                     if (w1 >= 0 && w2 >= 0 && w3 >= 0)
                     {
-                        Vertex temp = Vertex.BaryCentrePoint(v1, v2, v3, (float)w1, (float)w2, (float)w3);
-                        if (pixelInfront(x,y,temp.ScreenSpacePoint.z))
+                        float z = p1.z * w1 + p2.z * w2 + p3.z * w3;
+                        if (_zBuffer[y * _width + x] == z)
                         {
-                            Color color = _lightManager.GetColorWithLighting(temp);
+                            Vertex.BaryCentrePoint(v1, v2, v3, ref temp, w1, w2, w3);
+                            color.x = temp.Color.x;
+                            color.y = temp.Color.y;
+                            color.z = temp.Color.z;
+                            _lightManager.GetColorWithLighting(temp,ref color);
                             SetPixel(buffer, stride, x, y, color);
-                            setZValue(x, y, temp.ScreenSpacePoint.z);
                         }
                     }
+                    w1 += dW1;
+                    w2 += dW2;
+                    w3 += dW3;
                 }
             }
         }
+
+        //to:do map appropriately to ensure weights dont exceed 1.
+        static public unsafe void FillZBuffer(Vertex v1, Vertex v2, Vertex v3)
+        {
+            Vector3 p1 = v1.ScreenSpacePoint;
+            Vector3 p2 = v2.ScreenSpacePoint;
+            Vector3 p3 = v3.ScreenSpacePoint;
+
+            float area = EdgeFunction(p1, p2, p3);
+
+            int x0 = (int)Math.Min(p1.x, p2.x);
+            x0 = (int)Math.Min(x0, p3.x);
+
+            int x1 = (int)Math.Max(p1.x, p2.x);
+            x1 = (int)Math.Max(x1, p3.x);
+
+            int y0 = (int)Math.Min(p1.y, p2.y);
+            y0 = (int)Math.Min(y0, p3.y);
+
+            int y1 = (int)Math.Max(p1.y, p2.y);
+            y1 = (int)Math.Max(y1, p3.y);
+
+            float dxW1 = (p3.y - p2.y) /area ;
+            float dxW2 = (p1.y - p3.y) / area;
+            float dxW3 = (p2.y - p1.y) / area;
+
+            for (int y = y0; y <= y1; y++)
+            {
+                float w1 = EdgeFunction(p2, p3, x0, y) / area;
+                float w2 = EdgeFunction(p3, p1, x0, y) / area;
+                float w3 = EdgeFunction(p1, p2, x0, y) / area;
+                for (int x = x0; x <= x1; x++)
+                {
+                    if (w1 >= 0 && w2 >= 0 && w3 >= 0)
+                    {
+                        float z = (p1.z * w1 + p2.z * w2 + p3.z * w3);
+                        int zPos = y * _width + x;
+                        if (_zBuffer[zPos] > z)
+                        {
+                            _zBuffer[zPos] = z;
+                        }
+                    }
+                    w1 += dxW1;
+                    w2 += dxW2;
+                    w3 += dxW3;
+                }
+            }
+        }
+
 
         static public float EdgeFunction(Vector3 p1, Vector3 p2, float x, float y)
         {
@@ -238,23 +278,26 @@ namespace Console_based
             return (p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x);
         }
 
-        //to:do
         static private unsafe void getScreenSpaceFlatMesh(ref Vertex[] vertexBuffer, ref int count)
         {
             int len = count;
             count = 0;
             for (int i = 0; i < len; i += 3)
             {
-                if (vertexBuffer[i].InFrustrum() && vertexBuffer[i+1].InFrustrum() && vertexBuffer[i+2].InFrustrum())
+                if (vertexBuffer[i].InFrustrum() && vertexBuffer[i + 1].InFrustrum() && vertexBuffer[i + 2].InFrustrum())
                 {
-                    vertexBuffer[count] = vertexBuffer[i];
-                    vertexBuffer[count + 1] = vertexBuffer[i + 1];
-                    vertexBuffer[count + 2] = vertexBuffer[i + 2];
+                    //update when doing camera rotation, adding viewspace
+                    if (vertexBuffer[i].Normal.z > 0)
+                    {
+                        vertexBuffer[count] = vertexBuffer[i];
+                        vertexBuffer[count + 1] = vertexBuffer[i + 1];
+                        vertexBuffer[count + 2] = vertexBuffer[i + 2];
 
-                    vertexBuffer[count].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
-                    vertexBuffer[count + 1].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
-                    vertexBuffer[count + 2].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
-                    count += 3;
+                        vertexBuffer[count].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
+                        vertexBuffer[count + 1].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
+                        vertexBuffer[count + 2].SetToScreenSpace(_toScreenSpaceXMod, _toScreenSpaceYMod);
+                        count += 3;
+                    }
                 }
             }
         }
@@ -278,15 +321,23 @@ namespace Console_based
                 
                 foreach (FlatMesh mesh in _flatMeshes)
                 {
-                    long memoryBfore = GC.GetTotalMemory(false);
                     _cacheTotalPoints = 0;
+                    
                     mesh.CopyDataToVertexBuffer(ref _cachedVertexBuffer,ref _cacheTotalPoints);
-                    ProjectPoints2(ref _cachedVertexBuffer, _cacheTotalPoints);
+                    
+                    ProjectPoints(ref _cachedVertexBuffer, _cacheTotalPoints);
                     getScreenSpaceFlatMesh(ref _cachedVertexBuffer, ref _cacheTotalPoints);
+
+                    
                     for (int i = 0; i < _cacheTotalPoints; i += 3)
                     {
-                        FillTriangle2(pixelBuffer, stride, _cachedVertexBuffer[i], _cachedVertexBuffer[i+1], _cachedVertexBuffer[i+2]);
+                        FillZBuffer(_cachedVertexBuffer[i], _cachedVertexBuffer[i+1], _cachedVertexBuffer[i+2]);
                     }
+
+                    for (int i = 0; i < _cacheTotalPoints; i += 3)
+                    {
+                        FillTriangle(pixelBuffer, stride, _cachedVertexBuffer[i], _cachedVertexBuffer[i + 1], _cachedVertexBuffer[i + 2]);
+                    };
                 }
             }
             _bmp.UnlockBits(bmpData);

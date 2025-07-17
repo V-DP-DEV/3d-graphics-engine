@@ -61,6 +61,13 @@ namespace Console_based
             Vector3 result = new Vector3(_lightPos.x - point.x, _lightPos.y - point.y, _lightPos.z - point.z);
             return result;
         }
+        public void getLightDirection(Vector3 point, ref Vector3 lightDir)
+        {
+            lightDir.x = _lightPos.x - point.x;
+            lightDir.y = _lightPos.y - point.y;
+            lightDir.z = _lightPos.z - point.z;
+        }
+
         public float getMaxDistance()
         {
             return _maxDistance;
@@ -70,9 +77,9 @@ namespace Console_based
             return _lightColor;
         }
 
-        public void addSphereLight(Vector3 normal, Vector3 point, ref Vector3 target)
+        public void addSphereLight(Vector3 normal, Vector3 point, ref Vector3 target, ref Vector3 lightDirection)
         {
-            Vector3 lightDirection = getLightDirection(point);
+            getLightDirection(point, ref lightDirection);
             float distance = lightDirection.GetMagnitude();
             if (distance > _maxDistance)
             {
@@ -109,17 +116,17 @@ namespace Console_based
 
     public class LightManager
     {
-        public Vector3 ambientColor { get; private set; }
+        public Vector3 AmbientColor { get; private set; }
         public DirectLight DirectLight { get; private set; }
-        public SphereLight[] sphereLights { get; private set; }
-        public int totalLights { get; private set; }
+        public SphereLight[] SphereLights { get; private set; }
+        public int TotalLights { get; private set; }
 
         public LightManager(Vector3 ambientColor,DirectLight directLight, SphereLight[] sphereLights, int totalLights)
         {
-            this.ambientColor = ambientColor;
+            this.AmbientColor = ambientColor;
             DirectLight = directLight;
-            this.sphereLights = sphereLights;
-            this.totalLights = totalLights;
+            this.SphereLights = sphereLights;
+            this.TotalLights = totalLights;
         }
 
         public void ClampColor(ref Vector3 targetColor)
@@ -136,34 +143,39 @@ namespace Console_based
 
         public void setLights(DirectLight light, SphereLight[] sphereLights,int totalLights)
         {
-            this.sphereLights = sphereLights;
-            this.totalLights = totalLights;
+            this.SphereLights = sphereLights;
+            this.TotalLights = totalLights;
             DirectLight = light;
         }
 
         public void addSphereLight(SphereLight light)
         {
-            sphereLights[totalLights] = light;
-            totalLights++;
+            SphereLights[TotalLights] = light;
+            TotalLights++;
         }
         public void SetSphereLights(SphereLight[] lights, int totalLights)
         {
-            sphereLights = lights;
-            this.totalLights = totalLights;
+            SphereLights = lights;
+            this.TotalLights = totalLights;
         }
 
-        public Color GetColorWithLighting(Vertex v)
+        public void GetColorWithLighting(Vertex v, ref Vector3 target)
         {
-            Vector3 lightingIntensity = ambientColor;
-            DirectLight.addDirectLight(v.Normal, ref lightingIntensity);
-
-            for (int i = 0; i < sphereLights.Length; i++)
+            Vector3 lightingIntensity = AmbientColor;
+            if (DirectLight != null)
             {
-                sphereLights[i].addSphereLight(v.Normal, v.WorldPoint, ref lightingIntensity);
+                DirectLight.addDirectLight(v.Normal, ref lightingIntensity);
             }
+            Vector3 LightDir = new Vector3();
+            for (int i = 0; i < SphereLights.Length; i++)
+            {
+                SphereLights[i].addSphereLight(v.Normal, v.WorldPoint, ref lightingIntensity, ref LightDir);
+            }
+
             ClampColor(ref lightingIntensity);
-            Color result = Color.FromArgb((int)(lightingIntensity.x * v.Color.R), (int)(lightingIntensity.y * v.Color.G), (int)(lightingIntensity.z * v.Color.B));
-            return result;
+            target.x = (int)(target.x * lightingIntensity.x);
+            target.y = (int)(target.y * lightingIntensity.y);
+            target.z = (int)(target.z * lightingIntensity.z);
         }
     }
 }

@@ -86,14 +86,14 @@ namespace Console_based
     class FlatMesh
     {
         Vector3[] _points = new Vector3[2000];
-        Color[] _colors = new Color[2000];
+        Vector3[] _colors = new Vector3[2000];
         Vector3[] _normals = new Vector3[2000];
         int _totalPoints = 0;
         int _faceCount = 0;
 
         public FlatMesh() { }
 
-        public FlatMesh(Vector3[] vectorBuffer, int[] indexBuffer, Color[] colorBuffer)
+        public FlatMesh(Vector3[] vectorBuffer, int[] indexBuffer, Vector3[] colorBuffer)
         {
             int j = 0;
             for(int i = 0; i < indexBuffer.Length; i+=3)
@@ -103,7 +103,7 @@ namespace Console_based
             }
         }
 
-        public FlatMesh(Vector3[] vectorBuffer, int[] indexBuffer, Color[] colorBuffer, Vector3[] normalBuffer)
+        public FlatMesh(Vector3[] vectorBuffer, int[] indexBuffer, Vector3[] colorBuffer, Vector3[] normalBuffer)
         {
             int j = 0;
             for (int i = 0; i < indexBuffer.Length; i += 3)
@@ -144,7 +144,7 @@ namespace Console_based
                     {
                         string[] faceIndex = parts[1].Split("//");
                         _normals[_faceCount] = normals[int.Parse(faceIndex[1])-1];
-                        _colors[_faceCount] = Color.White;
+                        _colors[_faceCount] = new Vector3(255f,255f,255f);
                         _points[_totalPoints] = points[int.Parse(faceIndex[0]) - 1];
                         _totalPoints++;
                         for (int i = 1; i < 3; i++)
@@ -160,7 +160,7 @@ namespace Console_based
             stream.Close();
         }
 
-        public void AddFace(Vector3 p0, Vector3 p1, Vector3 p2, Color color)
+        public void AddFace(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 color)
         {
             _points[_totalPoints] = p0;
             _points[_totalPoints+1] = p1;
@@ -175,7 +175,7 @@ namespace Console_based
             _faceCount += 1;
         }
 
-        public void AddFace(Vector3 p0, Vector3 p1, Vector3 p2, Color color,Vector3 normal)
+        public void AddFace(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 color,Vector3 normal)
         {
             _points[_totalPoints] = p0;
             _points[_totalPoints + 1] = p1;
@@ -211,9 +211,9 @@ namespace Console_based
         public float V;
         public Vector3 ScreenSpacePoint; 
         public Vector3 Normal;
-        public Color Color;
+        public Vector3 Color;
 
-        public Vertex(Vector3 worldPoint,float u, float v, Vector3 normal, Color color)
+        public Vertex(Vector3 worldPoint,float u, float v, Vector3 normal, Vector3 color)
         {
             WorldPoint = worldPoint;
             U = u;
@@ -245,27 +245,30 @@ namespace Console_based
             return true;
         }
 
-        static public Vertex BaryCentrePoint(Vertex v1, Vertex v2, Vertex v3, float w1, float w2, float w3)
+        static public void BaryCentrePoint(Vertex v1, Vertex v2, Vertex v3,ref Vertex target, float w1, float w2, float w3)
         {
-            Vertex result = new Vertex();
+            
             Vector3 p1 = v1.ScreenSpacePoint;
             Vector3 p2 = v2.ScreenSpacePoint;
             Vector3 p3 = v3.ScreenSpacePoint;
-            result.ScreenSpacePoint = new Vector3(p1.x * w1 + p2.x * w2 + p3.x * w3, p1.y * w1 + p2.y * w2 + p3.y * w3, p1.z * w1 + p2.z * w2 + p3.z * w3);
+            target.ScreenSpacePoint.x = p1.x * w1 + p2.x * w2 + p3.x * w3;
+            target.ScreenSpacePoint.y = p1.y * w1 + p2.y * w2 + p3.y * w3;
+            target.ScreenSpacePoint.z = p1.z * w1 + p2.z * w2 + p3.z * w3;
+
             p1 = v1.WorldPoint;
             p2 = v2.WorldPoint;
             p3 = v3.WorldPoint;
 
-            result.WorldPoint = new Vector3(p1.x * w1 + p2.x * w2 + p3.x * w3, p1.y * w1 + p2.y * w2 + p3.y * w3, p1.z * w1 + p2.z * w2 + p3.z * w3);
+            target.WorldPoint.x = p1.x * w1 + p2.x * w2 + p3.x * w3;
+            target.WorldPoint.y = p1.y * w1 + p2.y * w2 + p3.y * w3;
+            target.WorldPoint.z = p1.z * w1 + p2.z * w2 + p3.z * w3;
 
-            result.Normal = v1.Normal;
-            result.Color = v1.Color;
-            return result;
+            target.Normal = v1.Normal;
+            target.Color = v1.Color;
         }
 
         public void SetToScreenSpace(float width, float height)
         {
-            //ScreenSpacePoint = new Vector3((int)((HomogounesPoint.x / HomogounesPoint.w + 1) * width), (int)((HomogounesPoint.y / HomogounesPoint.w + 1) * height), HomogounesPoint.z / HomogounesPoint.w);
             ScreenSpacePoint = new Vector3((int)((HomogounesPoint.x / HomogounesPoint.w + 1) * width), (int)((-HomogounesPoint.y / HomogounesPoint.w + 1) * height), HomogounesPoint.z / HomogounesPoint.w);
             //do additional divisions by w like for u v and color
         }
