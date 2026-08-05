@@ -86,6 +86,8 @@ namespace Console_based
     class FlatMesh
     {
         Vector3[] _points = new Vector3[2000];
+        float[] _u = new float[2000];
+        float[] _v = new float[2000];
         Vector3[] _colors = new Vector3[2000];
         Vector3[] _normals = new Vector3[2000];
         int _totalPoints = 0;
@@ -99,6 +101,16 @@ namespace Console_based
             for(int i = 0; i < indexBuffer.Length; i+=3)
             {
                 AddFace(vectorBuffer[indexBuffer[i]], vectorBuffer[indexBuffer[i + 1]], vectorBuffer[indexBuffer[i + 2]], colorBuffer[j]);
+                j++;
+            }
+        }
+
+        public FlatMesh(Vector3[] vectorBuffer, int[] indexBuffer, float[] u,float[] v)
+        {
+            int j = 0;
+            for (int i = 0; i < indexBuffer.Length; i += 3)
+            {
+                AddFace(vectorBuffer[indexBuffer[i]], vectorBuffer[indexBuffer[i + 1]], vectorBuffer[indexBuffer[i + 2]], [u[i], u[i+1], u[i+2]], [v[i], v[i + 1], v[i + 2]]);
                 j++;
             }
         }
@@ -168,7 +180,7 @@ namespace Console_based
             _colors[_faceCount] = color;
 
             _normals[_faceCount].x = (p0.y - p1.y) * (p0.z - p2.z) - (p0.z - p1.z) * (p0.y - p2.y);
-            _normals[_faceCount].y = ((p0.x - p1.x) * (p0.z - p2.z) - (p0.z - p1.z) * (p0.x - p2.x)) * -1;
+            _normals[_faceCount].y = ((p0.x - p1.x) * (p0.z - p2.z) - (p0.z - p1.z) * (p0.x - p2.x));
             _normals[_faceCount].z = (p0.x - p1.x) * (p0.y - p2.y) - (p0.y - p1.y) * (p0.x - p2.x);
             _normals[_faceCount].Normalize();
             _totalPoints += 3;
@@ -188,14 +200,36 @@ namespace Console_based
             _faceCount += 1;
         }
 
+        public void AddFace(Vector3 p0, Vector3 p1, Vector3 p2, float[] u, float[] v)
+        {
+            _points[_totalPoints] = p0;
+            _points[_totalPoints + 1] = p1;
+            _points[_totalPoints + 2] = p2;
+
+            _u[_totalPoints] = u[0];
+            _u[_totalPoints + 1] = u[1];
+            _u[_totalPoints + 2] = u[2];
+
+            _v[_totalPoints] = v[0];
+            _v[_totalPoints + 1] = v[1];
+            _v[_totalPoints + 2] = v[2];
+
+            _normals[_faceCount].x = (p0.y - p1.y) * (p0.z - p2.z) - (p0.z - p1.z) * (p0.y - p2.y);
+            _normals[_faceCount].y = ((p0.x - p1.x) * (p0.z - p2.z) - (p0.z - p1.z) * (p0.x - p2.x));
+            _normals[_faceCount].z = (p0.x - p1.x) * (p0.y - p2.y) - (p0.y - p1.y) * (p0.x - p2.x);
+
+            _totalPoints += 3;
+            _faceCount += 1;
+        }
+
         public void CopyDataToVertexBuffer(ref Vertex[] targetBuffer,ref int total)
         {
             int j = 0;
             for (int i = 0; i < _totalPoints; i+=3)
             {
-                targetBuffer[i] = new Vertex(_points[i], 0, 0, _normals[j], _colors[j]);
-                targetBuffer[i+1] = new Vertex(_points[i+1], 0, 0, _normals[j], _colors[j]);
-                targetBuffer[i+2] = new Vertex(_points[i+2], 0, 0, _normals[j], _colors[j]);
+                targetBuffer[i] = new Vertex(_points[i], _u[i], _v[i], _normals[j], _colors[j]);
+                targetBuffer[i+1] = new Vertex(_points[i+1], _u[i + 1], _v[i + 1], _normals[j], _colors[j]);
+                targetBuffer[i+2] = new Vertex(_points[i+2], _u[i + 2], _v[i + 2], _normals[j], _colors[j]);
                 j++;
                 total+=3;
             }
@@ -209,6 +243,7 @@ namespace Console_based
         public Vector4 HomogounesPoint;
         public float U;
         public float V;
+        public float InverseW;
         public Vector3 ScreenSpacePoint; 
         public Vector3 Normal;
         public Vector3 Color;
@@ -255,6 +290,9 @@ namespace Console_based
             target.ScreenSpacePoint.y = p1.y * w1 + p2.y * w2 + p3.y * w3;
             target.ScreenSpacePoint.z = p1.z * w1 + p2.z * w2 + p3.z * w3;
 
+            target.HomogounesPoint.w = v1.HomogounesPoint.w * w1 + v2.HomogounesPoint.w * w2 + v3.HomogounesPoint.w * w3;
+            target.InverseW = v1.InverseW * w1 + v2.InverseW * w2 + v3.InverseW * w3;
+
             p1 = v1.WorldPoint;
             p2 = v2.WorldPoint;
             p3 = v3.WorldPoint;
@@ -263,6 +301,8 @@ namespace Console_based
             target.WorldPoint.y = p1.y * w1 + p2.y * w2 + p3.y * w3;
             target.WorldPoint.z = p1.z * w1 + p2.z * w2 + p3.z * w3;
 
+            target.U = v1.U * w1 + v2.U * w2 + v3.U * w3;
+            target.V = v1.V * w1 + v2.V * w2 + v3.V * w3;
             target.Normal = v1.Normal;
             target.Color = v1.Color;
         }
@@ -271,6 +311,9 @@ namespace Console_based
         {
             ScreenSpacePoint = new Vector3((int)((HomogounesPoint.x / HomogounesPoint.w + 1) * width), (int)((-HomogounesPoint.y / HomogounesPoint.w + 1) * height), HomogounesPoint.z / HomogounesPoint.w);
             //do additional divisions by w like for u v and color
+            U /= HomogounesPoint.w;
+            V /= HomogounesPoint.w;
+            InverseW = 1 / HomogounesPoint.w;
         }
     }
 }

@@ -75,7 +75,7 @@ namespace Console_based
         static float _toScreenSpaceXMod;
         static float _toScreenSpaceYMod;
 
-        static List<Mesh> _meshes;
+        static List<FlatMesh> _meshes;
         static List<FlatMesh> _flatMeshes;
         static Camera _camera;
         static LightManager _lightManager;
@@ -86,9 +86,13 @@ namespace Console_based
         static bool[] _cacheBoolsInBox = new bool[2000];
         static int _cacheTotalPoints = 0;
 
+        static Vector3[] _texturePng;
+        static int _textureWidth;
+        static int _textureHeigth;
+
         static public void setDrawRules(int width,int height)
         {
-            _meshes = new List<Mesh>();
+            _meshes = new List<FlatMesh>();
             _flatMeshes = new List<FlatMesh>();
             _width = width;
             _height = height;
@@ -104,12 +108,45 @@ namespace Console_based
             _camera = camera;
         }
 
+        static public void setTexture(string path)
+        {
+            Bitmap bmp = new Bitmap(path);
+            _textureWidth = bmp.Width;
+            _textureHeigth = bmp.Height;
+
+            _texturePng = new Vector3[_textureWidth * (_textureHeigth+1)];
+
+            int i = 0;
+            for(int y=0; y < _textureHeigth; y++)
+            {
+                for (int x = 0; x < _textureHeigth; x++)
+                {
+                    Color c = bmp.GetPixel(x, y);
+                    int pos = x + y * _textureWidth;
+                    _texturePng[pos].x = c.R;
+                    _texturePng[pos].y = c.G;
+                    _texturePng[pos].z = c.B;
+                }
+            }
+        }
+
+        static public unsafe void DrawTexture(byte* buffer, int stride)
+        {
+            for(int y = 0; y < _textureHeigth; y++)
+            {
+                for(int x = 0; x < _textureWidth; x++)
+                {
+                    SetPixel(buffer, stride, x, y, _texturePng[x + y * _textureWidth]);
+                }
+            }
+        }
+
         static public void setLightManager(LightManager lightManager)
         {
             _lightManager = lightManager;
         }
 
-        static public void AddMesh(Mesh mesh)
+        static public void AddMesh(FlatMesh mesh)
         {
             _meshes.Add(mesh);
         }
@@ -164,6 +201,33 @@ namespace Console_based
             pixel[3] = 255;
         }
 
+        static public void Bilinear(float x, float y, ref Vector3 target)
+        {
+            int x0= (int)x;
+            float x1Weight = x - x0;
+            float x0Weight = 1-x1Weight;
+
+            int y0 = (int)y;
+            float y1Weight = y - y0;
+            float y0Weight = 1 - y1Weight;
+
+            int pos = x0 + y0 * _textureWidth;
+
+            Vector3[] colors = [_texturePng[pos], _texturePng[pos+1], _texturePng[pos+_textureWidth] , _texturePng[pos + _textureWidth + 1]];
+            Vector3 topPoint = new Vector3(colors[0].x * x0Weight + colors[1].x * x1Weight, colors[0].y * x0Weight + colors[1].y * x1Weight, colors[0].z * x0Weight + colors[1].z * x1Weight);
+            Vector3 bottomPoint = new Vector3(colors[2].x * x0Weight + colors[3].x * x1Weight, colors[2].y * x0Weight + colors[3].y * x1Weight, colors[2].z * x0Weight + colors[3].z * x1Weight);
+
+            target.x = topPoint.x * y0Weight + bottomPoint.x * y1Weight;
+            target.y = topPoint.y * y0Weight + bottomPoint.y * y1Weight;
+            target.z = topPoint.z * y0Weight + bottomPoint.z * y1Weight;
+            //int y0 = (int)x;
+            //int y1 = x0 + 1;
+            //float dify = y - y0;
+            //target.x  = (_texturePng[pos].x + _texturePng[pos+1].x + _texturePng[pos + _textureWidth].x + _texturePng[pos + _textureWidth + 1].x) / 4;
+            //target.y = (_texturePng[pos].y + _texturePng[pos + 1].y + _texturePng[pos + _textureWidth].y + _texturePng[pos + _textureWidth + 1].y) / 4;
+            //target.z = (_texturePng[pos].z + _texturePng[pos + 1].z + _texturePng[pos + _textureWidth].z + _texturePng[pos + _textureWidth + 1].z) / 4;
+        }
+
         //to:do map appropriately to ensure weights dont exceed 1.
         static public unsafe void FillTriangle(byte* buffer, int stride, Vertex v1, Vertex v2, Vertex v3)
         {
@@ -205,9 +269,14 @@ namespace Console_based
                         if (_zBuffer[y * _width + x] == z)
                         {
                             Vertex.BaryCentrePoint(v1, v2, v3, ref temp, w1, w2, w3);
+                            float textx = temp.U * _textureWidth / temp.InverseW;
+                            float texty = temp.V * _textureHeigth / temp.InverseW;
+                            //Bilinear(textx, texty,ref color);
+
                             color.x = temp.Color.x;
                             color.y = temp.Color.y;
                             color.z = temp.Color.z;
+
                             _lightManager.GetColorWithLighting(temp,ref color);
                             SetPixel(buffer, stride, x, y, color);
                         }
@@ -318,7 +387,7 @@ namespace Console_based
             unsafe {
                 byte* pixelBuffer = (byte*)ptr;
                 ClearScreen(pixelBuffer, stride);
-                
+
                 foreach (FlatMesh mesh in _flatMeshes)
                 {
                     _cacheTotalPoints = 0;
